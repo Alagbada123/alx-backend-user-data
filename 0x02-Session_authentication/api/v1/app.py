@@ -77,7 +77,7 @@ def before_request():
         abort(401)
 
     # Assign current_user to request.current_user
-    # This handles cases for both basic auth and session auth trying to get user
+    # This handles cases for both basic auth and session auth for user
     request.current_user = auth.current_user(request)
 
     if request.current_user is None:
