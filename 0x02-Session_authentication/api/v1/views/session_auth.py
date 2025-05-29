@@ -15,26 +15,34 @@ def login() -> Tuple[str, int]:
     Return:
       - JSON representation of a User object.
     """
-    not_found_res = {"error": "no user found for this email"}
     email = request.form.get('email')
     if email is None or len(email.strip()) == 0:
         return jsonify({"error": "email missing"}), 400
     password = request.form.get('password')
     if password is None or len(password.strip()) == 0:
         return jsonify({"error": "password missing"}), 400
+
     try:
         users = User.search({'email': email})
-    except Exception:
-        return jsonify(not_found_res), 404
-    if len(users) <= 0:
-        return jsonify(not_found_res), 404
-    if users[0].is_valid_password(password):
-        from api.v1.app import auth
-        sessiond_id = auth.create_session(getattr(users[0], 'id'))
-        res = jsonify(users[0].to_json())
-        res.set_cookie(os.getenv("SESSION_NAME"), sessiond_id)
-        return res
-    return jsonify({"error": "wrong password"}), 401
+    except Exception: # Should be more specific if possible, but following prompt
+        return jsonify({"error": "no user found for this email"}), 404 # Technically server error if search fails
+    
+    if not users: # users is empty or None
+        return jsonify({"error": "no user found for this email"}), 404
+
+    user = users[0]
+    if not user.is_valid_password(password):
+        return jsonify({"error": "wrong password"}), 401
+
+    # If password is valid:
+    from api.v1.app import auth # Import auth here as requested
+    session_id = auth.create_session(user.id) # getattr(users[0], 'id') from prompt, user.id is cleaner
+    
+    response = jsonify(user.to_json())
+    session_name = os.getenv("SESSION_NAME")
+    if session_name: # Ensure session_name is defined before setting cookie
+        response.set_cookie(session_name, session_id)
+    return response
 
 
 @app_views.route(
@@ -44,8 +52,7 @@ def logout() -> Tuple[str, int]:
     Return:
       - An empty JSON object.
     """
-    from api.v1.app import auth
-    is_destroyed = auth.destroy_session(request)
-    if not is_destroyed:
+    from api.v1.app import auth # Import auth here as requested
+    if not auth.destroy_session(request):
         abort(404)
-    return jsonify({})
+    return jsonify({}), 200
