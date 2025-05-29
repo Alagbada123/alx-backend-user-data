@@ -30,7 +30,7 @@ def view_one_user(user_id: str = None) -> str:
 
     if user_id == "me":
         if request.current_user is None:
-            abort(404)  # No authenticated user or "me" requested by non-logged-in user
+            abort(404)  # No authenticated user
         else:
             return jsonify(request.current_user.to_json())
     else:
@@ -49,10 +49,7 @@ def delete_user(user_id: str = None) -> str:
       - empty JSON is the User has been correctly deleted
       - 404 if the User ID doesn't exist
     """
-    # For DELETE /api/v1/users/me, it should typically be forbidden or handled.
-    # However, the requirement is only for GET /api/v1/users/me.
-    # So, if user_id == "me", it will try User.get("me") which will likely fail (404).
-    # This behavior is maintained as per instruction "Otherwise, keep the same behavior".
+
     if user_id is None:
         abort(404)
     user = User.get(user_id)
@@ -113,7 +110,7 @@ def update_user(user_id: str = None) -> str:
       - 404 if the User ID doesn't exist
       - 400 if can't update the User
     """
-    # Similar to DELETE, PUT /api/v1/users/me is not explicitly handled by Req 1.
+    # Similar to DELETE, PUT /api/v1/users/me is not explicitly handled
     # It will try User.get("me") and likely 404.
     if user_id is None:
         abort(404)

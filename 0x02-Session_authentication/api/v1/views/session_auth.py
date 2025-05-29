@@ -24,10 +24,10 @@ def login() -> Tuple[str, int]:
 
     try:
         users = User.search({'email': email})
-    except Exception: # Should be more specific if possible, but following prompt
-        return jsonify({"error": "no user found for this email"}), 404 # Technically server error if search fails
-    
-    if not users: # users is empty or None
+    except Exception:  # Should be more specific if possible
+        return jsonify({"error": "no user found for this email"}), 404
+
+    if not users:  # users is empty or None
         return jsonify({"error": "no user found for this email"}), 404
 
     user = users[0]
@@ -35,12 +35,12 @@ def login() -> Tuple[str, int]:
         return jsonify({"error": "wrong password"}), 401
 
     # If password is valid:
-    from api.v1.app import auth # Import auth here as requested
-    session_id = auth.create_session(user.id) # getattr(users[0], 'id') from prompt, user.id is cleaner
-    
+    from api.v1.app import auth  # Import auth here as requested
+    session_id = auth.create_session(user.id)  # getattr(users[0], 'id')
+
     response = jsonify(user.to_json())
     session_name = os.getenv("SESSION_NAME")
-    if session_name: # Ensure session_name is defined before setting cookie
+    if session_name:  # Ensure session_name is defined before setting cookie
         response.set_cookie(session_name, session_id)
     return response
 
@@ -52,7 +52,7 @@ def logout() -> Tuple[str, int]:
     Return:
       - An empty JSON object.
     """
-    from api.v1.app import auth # Import auth here as requested
+    from api.v1.app import auth  # Import auth here as requested
     if not auth.destroy_session(request):
         abort(404)
     return jsonify({}), 200

@@ -16,12 +16,9 @@ class SessionDBAuth(SessionExpAuth):
     def create_session(self, user_id=None) -> str:
         """Creates and stores a session id for the user.
         """
-        session_id = super().create_session(user_id) # This now calls SessionExpAuth's create_session
-                                                    # which means session_id_by_session_id will be populated.
-                                                    # For DB auth, that in-memory dict might be redundant if UserSession is the sole source of truth.
-                                                    # However, SessionExpAuth needs it for its logic.
-                                                    # The instruction is to call super().create_session(user_id), get session_id, then store UserSession.
-        if session_id is None: # Check if super call failed
+        session_id = super().create_session(user_id)
+
+        if session_id is None:  # Check if super call failed
             return None
 
         kwargs = {
@@ -39,33 +36,28 @@ class SessionDBAuth(SessionExpAuth):
         """
         if session_id is None:
             return None
-            
         try:
-            # Assuming UserSession.search can filter by session_id
-            # and returns a list of UserSession instances
             user_sessions = UserSession.search({'session_id': session_id})
-        except Exception: # Broad exception, consider specific ones if known
+        except Exception:  # Broad exception, consider specific ones if known
             return None
-        
-        if not user_sessions: # If no session found in DB
-            return None
-        
-        user_session = user_sessions[0] # Get the first matching session
 
-        # Check expiration based on session_duration from SessionExpAuth
+        if not user_sessions:  # If no session found in DB
+            return None
+
+        user_session = user_sessions[0]  # Get the first matching session
+
         if self.session_duration <= 0:
             return user_session.user_id
 
-        created_at = user_session.created_at # UserSession must have 'created_at' from Base model
-        if created_at is None: # Should not happen if Base model handles created_at
+        created_at = user_session.created_at
+        if created_at is None:
             return None
 
         expiration_time = created_at + timedelta(seconds=self.session_duration)
         if expiration_time < datetime.now():
-            # Optional: could also delete the expired session from DB here
             # user_session.remove()
             return None
-            
+
         return user_session.user_id
 
     def destroy_session(self, request=None) -> bool:
@@ -73,21 +65,18 @@ class SessionDBAuth(SessionExpAuth):
         """
         if request is None:
             return False
-        
+
         session_id = self.session_cookie(request)
         if session_id is None:
             return False
-
         # Remove from DB
         try:
             user_sessions = UserSession.search({'session_id': session_id})
         except Exception:
-            return False # Error during search
-
-        if not user_sessions: # No session found in DB to destroy
+            return False  # Error during search
+        if not user_sessions:  # No session found in DB to destroy
             return False
-        
         user_session_to_delete = user_sessions[0]
-        user_session_to_delete.remove() # Assuming remove deletes from storage and save persists it
-        
+        user_session_to_delete.remove()
+
         return True

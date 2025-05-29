@@ -2,7 +2,7 @@
 """Authentication module for the API.
 """
 import re
-import os # Added for getenv
+import os  # Added for getenv
 from typing import List, TypeVar
 from flask import request
 
@@ -38,12 +38,12 @@ class Auth:
         """
         return None
 
-    def session_cookie(self, request=None): # Req 5
+    def session_cookie(self, request=None):  # Req 5
         """Gets the session cookie value from the request.
         """
         if request is None:
             return None
         cookie_name = os.getenv("SESSION_NAME")
-        if not cookie_name: 
+        if not cookie_name:
             return None
         return request.cookies.get(cookie_name)
