@@ -16,42 +16,78 @@ class SessionDBAuth(SessionExpAuth):
     def create_session(self, user_id=None) -> str:
         """Creates and stores a session id for the user.
         """
-        session_id = super().create_session(user_id)
-        if type(session_id) == str:
-            kwargs = {
-                'user_id': user_id,
-                'session_id': session_id,
-            }
-            user_session = UserSession(**kwargs)
-            user_session.save()
-            return session_id
+        session_id = super().create_session(user_id) # This now calls SessionExpAuth's create_session
+                                                    # which means session_id_by_session_id will be populated.
+                                                    # For DB auth, that in-memory dict might be redundant if UserSession is the sole source of truth.
+                                                    # However, SessionExpAuth needs it for its logic.
+                                                    # The instruction is to call super().create_session(user_id), get session_id, then store UserSession.
+        if session_id is None: # Check if super call failed
+            return None
 
-    def user_id_for_session_id(self, session_id=None):
+        kwargs = {
+            'user_id': user_id,
+            'session_id': session_id,
+        }
+        user_session = UserSession(**kwargs)
+        user_session.save()
+        # UserSession.save_to_file() # if Base has this mechanism like User
+        return session_id
+
+    def user_id_for_session_id(self, session_id=None) -> str:
         """Retrieves the user id of the user associated with
         a given session id.
         """
+        if session_id is None:
+            return None
+            
         try:
-            sessions = UserSession.search({'session_id': session_id})
-        except Exception:
+            # Assuming UserSession.search can filter by session_id
+            # and returns a list of UserSession instances
+            user_sessions = UserSession.search({'session_id': session_id})
+        except Exception: # Broad exception, consider specific ones if known
             return None
-        if len(sessions) <= 0:
+        
+        if not user_sessions: # If no session found in DB
             return None
-        cur_time = datetime.now()
-        time_span = timedelta(seconds=self.session_duration)
-        exp_time = sessions[0].created_at + time_span
-        if exp_time < cur_time:
+        
+        user_session = user_sessions[0] # Get the first matching session
+
+        # Check expiration based on session_duration from SessionExpAuth
+        if self.session_duration <= 0:
+            return user_session.user_id
+
+        created_at = user_session.created_at # UserSession must have 'created_at' from Base model
+        if created_at is None: # Should not happen if Base model handles created_at
             return None
-        return sessions[0].user_id
+
+        expiration_time = created_at + timedelta(seconds=self.session_duration)
+        if expiration_time < datetime.now():
+            # Optional: could also delete the expired session from DB here
+            # user_session.remove()
+            return None
+            
+        return user_session.user_id
 
     def destroy_session(self, request=None) -> bool:
-        """Destroys an authenticated session.
+        """Destroys an authenticated session from the database.
         """
+        if request is None:
+            return False
+        
         session_id = self.session_cookie(request)
+        if session_id is None:
+            return False
+
+        # Remove from DB
         try:
-            sessions = UserSession.search({'session_id': session_id})
+            user_sessions = UserSession.search({'session_id': session_id})
         except Exception:
+            return False # Error during search
+
+        if not user_sessions: # No session found in DB to destroy
             return False
-        if len(sessions) <= 0:
-            return False
-        sessions[0].remove()
+        
+        user_session_to_delete = user_sessions[0]
+        user_session_to_delete.remove() # Assuming remove deletes from storage and save persists it
+        
         return True
